@@ -1,0 +1,88 @@
+#Written by Jasper Hatilima 01.06.2021
+
+loadrt [KINS]KINEMATICS
+loadrt [EMCMOT]EMCMOT servo_period_nsec=[EMCMOT]SERVO_PERIOD num_joints=[KINS]JOINTS
+loadrt hostmot2
+loadrt hm2_pci config="firmware=hm2/5i23/SV12.BIT num_encoders=1 num_pwmgens=1 num_stepgens=0"
+loadrt pid names=pidp #comma seperated and no spaces
+
+addf motion-command-handler   servo-thread
+addf motion-controller        servo-thread
+addf hm2_5i23.0.read          servo-thread
+addf hm2_5i23.0.write         servo-thread
+addf pidp.do-pid-calcs        servo-thread
+
+
+
+#*******************
+#  AXIS X JOINT 0
+#*******************
+
+
+# ---PWM Generator signals/setup---
+setp    hm2_5i23.0.pwmgen.pwm_frequency 150000
+setp    hm2_5i23.0.watchdog.timeout_ns 5000000
+setp   	hm2_5i23.0.pwmgen.00.output-type 1
+#setp   	hm2_5i23.0.pwmgen.00.scale  [JOINT_0]OUTPUT_SCALE
+setp   	hm2_5i23.0.pwmgen.00.scale 40
+
+net x-output                             => hm2_5i23.0.pwmgen.00.value
+net pwm-enable     						 => hm2_5i23.0.pwmgen.00.enable
+
+
+
+# -- configure some direction pins on hm2_5i23 gpio
+setp hm2_5i23.0.gpio.012.is_output TRUE
+setp hm2_5i23.0.gpio.013.is_output TRUE
+#net dir1 => hm2_5i23.0.gpio.012.out
+#net dir2 => hm2_5i23.0.gpio.013.out
+net dir1	 hm2_5i23.0.gpio.023.in 	=> hm2_5i23.0.gpio.012.out
+net dir2 	 hm2_5i23.0.gpio.023.in_not => hm2_5i23.0.gpio.013.out
+
+# -- setting up encoder 
+#(remember to addf hm2_5i23.0.read to the servo thread at top of file)
+setp    hm2_5i23.0.encoder.00.counter-mode 0
+setp    hm2_5i23.0.encoder.00.filter 1
+setp    hm2_5i23.0.encoder.00.index-invert 0
+setp    hm2_5i23.0.encoder.00.index-mask 0
+setp    hm2_5i23.0.encoder.00.index-mask-invert 0
+setp    hm2_5i23.0.encoder.00.scale  1651
+#also scale = 1 if you want to command ticks
+#scale = 1651 commands mm moved by gear wheel.
+
+
+# -- setting up PID module for position (outer loop)
+#(remember to loadrt PID and to add do-pid-calcs to servo thread at top of file)
+setp   pidp.Pgain     10
+#reduce this gain to 0.001 for scale of 1
+setp   pidp.Igain     0.00
+setp   pidp.Dgain     0.00
+setp   pidp.bias      [JOINT_0]BIAS
+setp   pidp.FF0       [JOINT_0]FF0
+setp   pidp.FF1       [JOINT_0]FF1
+setp   pidp.FF2       [JOINT_0]FF2
+setp   pidp.deadband  [JOINT_0]DEADBAND
+setp   pidp.maxoutput [JOINT_0]MAX_OUTPUT
+setp   pidp.error-previous-target true
+setp   pidp.enable true
+
+# -- the control loop
+
+#read from sensor:
+net posfb         	<=  hm2_5i23.0.encoder.00.position
+#net velfb         	<=  hm2_5i23.0.encoder.00.velocity
+
+#push into controller:
+
+#pos
+net poscmd       		=>  pidp.command
+net posfb        		=>  pidp.feedback
+net x-output        	<=  pidp.output
+
+sets pwm-enable TRUE #just to activate the PWM
+#use sets status 0 to stop the PID
+net status			=>	pidp.enable
+
+
+loadusr halscope
+start

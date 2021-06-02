@@ -1,0 +1,15 @@
+<pyvcp>
+	<meter>
+    		<halpin>"mymeter"</halpin>
+    		<text>"Battery"</text>
+    		<subtext>"Volts"</subtext>
+    		<size>250</size>
+    		<min_>0</min_>
+    		<max_>15.5</max_>
+    		<majorscale>1</majorscale>
+    		<minorscale>0.2</minorscale>
+    		<region1>(14.5,15.5,"yellow")</region1>
+    		<region2>(12,14.5,"green")</region2>
+    		<region3>(0,12,"red")</region3>
+	</meter>
+</pyvcp>

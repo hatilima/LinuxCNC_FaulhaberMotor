@@ -1,0 +1,20 @@
+Ku = 0.5
+
+Tu = 10ms
+
+For PI controller,
+P = 0.45*Ku = 0.45*0.5 = 0.225 (even 0.23 would work)
+I = (0.54*Ku)/Tu = (0.54*0.5)/0.01 = 27
+
+We use these values of gain. This is the Ziegler-Nichols method of tuning.
+
+As you can see, the I value of 27 is not giving good tracking, especially the
+funny part in the transient phase...
+Lets us reduce it to 15, then maybe 10...
+I accidentally skipped 15 and went straight to 10 :-)
+and 10 does not look too bad...let's try more....
+I don't have a specific target for maximum percent overshoot...but 15 seems
+to have an overshoot that I personally wouldn't want...let's go to ten and downwards..
+I = 8 looks good...I think I would then try out in the range of 8.0 to 9.0.
+It would be interesting to see effects of Dgain
+

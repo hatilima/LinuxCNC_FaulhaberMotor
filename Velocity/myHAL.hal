@@ -1,0 +1,92 @@
+#Written by Jasper Hatilima 30.04.2021
+
+loadrt [KINS]KINEMATICS
+loadrt [EMCMOT]EMCMOT servo_period_nsec=[EMCMOT]SERVO_PERIOD num_joints=[KINS]JOINTS
+loadrt hostmot2
+loadrt hm2_pci config="firmware=hm2/5i23/SV12.BIT num_encoders=1 num_pwmgens=1 num_stepgens=0"
+loadrt pid names=pidx #comma seperated and no space after comma
+loadrt siggen
+
+
+addf motion-command-handler   servo-thread
+addf motion-controller        servo-thread
+addf hm2_5i23.0.read          servo-thread
+addf hm2_5i23.0.write         servo-thread
+addf pidx.do-pid-calcs        servo-thread
+addf siggen.0.update		  servo-thread
+
+setp siggen.0.amplitude 1000
+#frequency is in Hertz
+setp siggen.0.frequency 0.2
+
+
+
+#*******************
+#  AXIS X JOINT 0
+#*******************
+
+
+# ---PWM Generator signals/setup---max 187497Hz
+setp    hm2_5i23.0.pwmgen.pwm_frequency 50000
+#setp    hm2_5i23.0.pwmgen.pdm_frequency 300000
+setp    hm2_5i23.0.watchdog.timeout_ns 5000000
+setp   	hm2_5i23.0.pwmgen.00.output-type 1
+setp   	hm2_5i23.0.pwmgen.00.scale [JOINT_0]OUTPUT_SCALE
+
+net x-output                             => hm2_5i23.0.pwmgen.00.value
+net pwm-enable     						 => hm2_5i23.0.pwmgen.00.enable
+
+
+
+# -- configure some direction pins on hm2_5i23 gpio
+setp hm2_5i23.0.gpio.012.is_output TRUE
+setp hm2_5i23.0.gpio.013.is_output TRUE
+#net dir1 => hm2_5i23.0.gpio.012.out
+#net dir2 => hm2_5i23.0.gpio.013.out
+net dir1	 hm2_5i23.0.gpio.023.in 	=> hm2_5i23.0.gpio.012.out
+net dir2 	 hm2_5i23.0.gpio.023.in_not => hm2_5i23.0.gpio.013.out
+
+# -- setting up encoder 
+#(remember to addf hm2_5i23.0.read to the servo thread at top of file)
+setp    hm2_5i23.0.encoder.00.counter-mode 0
+setp    hm2_5i23.0.encoder.00.filter 1
+setp    hm2_5i23.0.encoder.00.index-invert 0
+setp    hm2_5i23.0.encoder.00.index-mask 0
+setp    hm2_5i23.0.encoder.00.index-mask-invert 0
+setp    hm2_5i23.0.encoder.00.scale  [JOINT_0]ENCODER_SCALE
+
+# -- setting up PID
+#(remember to loadrt PID and to add pid-calcs to servo thread at top of file)
+setp   pidx.Pgain     [JOINT_0]P
+setp   pidx.Igain     [JOINT_0]I
+setp   pidx.Dgain     [JOINT_0]D
+setp   pidx.bias      [JOINT_0]BIAS
+setp   pidx.FF0       [JOINT_0]FF0
+setp   pidx.FF1       [JOINT_0]FF1
+setp   pidx.FF2       [JOINT_0]FF2
+setp   pidx.deadband  [JOINT_0]DEADBAND
+setp   pidx.maxoutput [JOINT_0]MAX_OUTPUT
+setp   pidx.error-previous-target true
+setp   pidx.enable true
+
+# -- the control loop
+#read from sensor:
+net x-posfb         	<=  hm2_5i23.0.encoder.00.position
+net x-velfb         	<=  hm2_5i23.0.encoder.00.velocity
+
+#push into controller:
+net pid-enable        	=>  pidx.enable
+net x-velcmd       		=>  pidx.command
+#The x-velcmd signal above was updated through terminal, but now we will
+#attach pidx.command to siggen.0.square pin so that we can see step
+#response make sure you adjust Pgain and Igain after starting:
+net x-velcmd siggen.0.square => pidx.command
+net x-velcmd => pidx.command
+net x-velfb        		=>  pidx.feedback
+net x-output        	<=  pidx.output
+
+
+sets pid-enable TRUE #just to activate the PID
+sets pwm-enable TRUE #just to activate the PWM
+loadusr halscope
+start
